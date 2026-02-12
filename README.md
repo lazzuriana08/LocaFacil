@@ -100,6 +100,8 @@ flowchart TD
 - NodeJS
 - PostgreeSQL
 
+---
+
 ## Arquitetura Geral
 
 A arquitetura do **LocaFacil** foi projetada com foco em **modularidade, manutenibilidade e reuso de software**, adotando uma abordagem **serverless**. O sistema é composto por um frontend desenvolvido em **React**, que se comunica com uma **API em Node.js** hospedada na **Vercel**, e utiliza **PostgreSQL** como banco de dados relacional gerenciado pela **Neon**.
