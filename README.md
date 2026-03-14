@@ -1,15 +1,22 @@
 # CC7540 — LocaFácil API
 
+> **Laboratório 4 — Componentes, Interfaces e Injeção de Dependência**  
+> Disciplina: CC7540 | Node.js + PostgreSQL + Express
+
+---
+
 ## Sumário
 
 1. [Visão Geral do Projeto](#1-visão-geral-do-projeto)
-2. [Componentes Implementados](#3-componentes-implementados)
-3. [Interfaces Fornecidas e Requeridas](#4-interfaces-fornecidas-e-requeridas)
-4. [Como a Comunicação Ocorre entre os Componentes](#5-como-a-comunicação-ocorre-entre-os-componentes)
-5. [Como o Acoplamento Direto Foi Evitado](#6-como-o-acoplamento-direto-foi-evitado)
-6. [Estrutura de Pastas](#7-estrutura-de-pastas)
-7. [Instruções para Execução](#8-instruções-para-execução)
-8. [Endpoints da API](#9-endpoints-da-api)
+2. [Arquitetura Implementada](#2-arquitetura-implementada)
+3. [Componentes Implementados](#3-componentes-implementados)
+4. [Interfaces Fornecidas e Requeridas](#4-interfaces-fornecidas-e-requeridas)
+5. [Como a Comunicação Ocorre entre os Componentes](#5-como-a-comunicação-ocorre-entre-os-componentes)
+6. [Como o Acoplamento Direto Foi Evitado](#6-como-o-acoplamento-direto-foi-evitado)
+7. [Estrutura de Pastas](#7-estrutura-de-pastas)
+8. [Instruções para Execução](#8-instruções-para-execução)
+9. [Como Testar a Aplicação](#9-como-testar-a-aplicação)
+10. [Endpoints da API](#10-endpoints-da-api)
 
 ---
 
@@ -21,8 +28,59 @@ A arquitetura segue o princípio de **comunicação exclusivamente por interface
 
 ---
 
+## 2. Arquitetura Implementada
 
-## 2. Componentes Implementados
+O sistema é dividido em três camadas:
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   CAMADA DE ROTAS                   │
+│  (clientes das interfaces — não conhecem a impl.)   │
+│  vehicles.js  electronics.js  insurance.js          │
+│  rentals.js                                         │
+└────────────────────┬────────────────────────────────┘
+                     │ usa apenas a interface
+┌────────────────────▼────────────────────────────────┐
+│                CAMADA DE COMPONENTES                │
+│           (implementações concretas)                │
+│  ProdutoComponent   SeguroComponent                 │
+│  LocacaoComponent   PagamentoComponent              │
+└────────────────────┬────────────────────────────────┘
+                     │ implementam / extends
+┌────────────────────▼────────────────────────────────┐
+│                CAMADA DE INTERFACES                 │
+│            (contratos abstratos — <<interface>>)    │
+│  ProdutoService   SeguroService                     │
+│  LocacaoService   PagamentoService                  │
+└─────────────────────────────────────────────────────┘
+```
+
+### Diagrama de Dependência entre Componentes
+
+```
+                 ┌─────────────────┐
+                 │ ProdutoComponent│──── fornece ──▶ ProdutoService
+                 └────────┬────────┘
+                          │ injetado via require
+                 ┌────────▼────────┐
+                 │ SeguroComponent │──── fornece ──▶ SeguroService
+                 └────────┬────────┘
+                          │ injetado via require
+                 ┌────────▼────────┐
+                 │LocacaoComponent │──── fornece ──▶ LocacaoService
+                 │                 │◀─── requer  ─── ProdutoService
+                 │                 │◀─── requer  ─── SeguroService
+                 └────────┬────────┘
+                          │ injetado via require
+                 ┌────────▼──────────┐
+                 │PagamentoComponent │── fornece ──▶ PagamentoService
+                 │                   │◀─ requer  ─── LocacaoService
+                 └───────────────────┘
+```
+
+---
+
+## 3. Componentes Implementados
 
 ### Componente 1 — `LocacaoComponent`
 
@@ -92,7 +150,7 @@ Gerencia as apólices de seguro disponíveis para associação a uma locação.
 
 ---
 
-## 3. Interfaces Fornecidas e Requeridas
+## 4. Interfaces Fornecidas e Requeridas
 
 ### Interfaces Fornecidas (o que cada componente expõe)
 
@@ -135,7 +193,7 @@ confirmarPagamento(idTransacao)                // confirma o status no banco
 
 ---
 
-## 4. Como a Comunicação Ocorre entre os Componentes
+## 5. Como a Comunicação Ocorre entre os Componentes
 
 A comunicação entre componentes **nunca ocorre diretamente** — sempre passa pela interface.
 
@@ -209,7 +267,7 @@ class PagamentoComponent extends PagamentoService {
 
 ---
 
-## 5. Como o Acoplamento Direto Foi Evitado
+## 6. Como o Acoplamento Direto Foi Evitado
 
 ### Problema do acoplamento direto
 
@@ -244,7 +302,7 @@ O `LocacaoComponent` nunca instancia `ProdutoComponent` diretamente — ele rece
 
 ---
 
-## 6. Estrutura de Pastas
+## 7. Estrutura de Pastas
 
 ```
 src/
@@ -293,12 +351,16 @@ src/
 
 ---
 
-## 7. Instruções para Execução
+## 8. Instruções para Execução
 
 ### Pré-requisitos
 
 - [Node.js](https://nodejs.org/) v18 ou superior
 - [PostgreSQL](https://www.postgresql.org/) v14 ou superior
+
+### Observação sobre conexão com banco
+
+O arquivo `src/config/database.js` utiliza conexão PostgreSQL com SSL habilitado. Isso funciona bem em bancos hospedados em nuvem. Se o teste for feito com PostgreSQL local e a instância não aceitar SSL, a conexão pode falhar. Nesse cenário, será necessário ajustar a configuração de conexão antes de executar a aplicação.
 
 ### 1. Clonar o repositório
 
@@ -318,7 +380,7 @@ npm install
 Crie um arquivo `.env` na raiz do projeto:
 
 ```env
-DATABASE_URL=postgresql://usuario:senha@localhost:5432/locafacil
+DATABASE_URL=postgresql://usuario:senha@host:5432/locafacil
 JWT_SECRET=sua_chave_secreta_aqui
 PORT=5000
 NODE_ENV=development
@@ -333,7 +395,9 @@ npm run migrate
 Este comando executa os scripts em `src/database/migrations/` na ordem:
 - `001_create_tables.sql` — cria as tabelas
 - `002_seed_data.sql` — insere dados de exemplo
-- `003_admin_user.sql` — cria usuário administrador padrão
+- `003_admin_user.sql` — cria registro de usuário administrador padrão
+
+Observação: o arquivo `003_admin_user.sql` contém um hash placeholder para a senha do administrador. Portanto, após rodar as migrations, o fluxo mais confiável de teste é registrar um usuário novo via API. As rotas administrativas só ficam totalmente testáveis depois que existir um usuário com `is_admin = true` e senha válida no banco.
 
 ### 5. Iniciar o servidor
 
@@ -351,13 +415,164 @@ Verificar se está rodando: `GET http://localhost:5000/health`
 
 ---
 
-## 8. Endpoints da API
+## 9. Como Testar a Aplicação
+
+### 1. Verificar o health check
+
+Requisição:
+
+```http
+GET /health
+```
+
+Resposta esperada:
+
+```json
+{ "status": "API LocaFácil is running" }
+```
+
+### 2. Registrar um usuário
+
+Requisição:
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+```
+
+Exemplo de body:
+
+```json
+{
+        "name": "Teste Usuario",
+        "email": "teste@locafacil.com",
+        "password": "123456",
+        "phone": "11999999999",
+        "cpf": "12345678900"
+}
+```
+
+### 3. Fazer login para obter token JWT
+
+Requisição:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+```
+
+Exemplo de body:
+
+```json
+{
+        "email": "teste@locafacil.com",
+        "password": "123456"
+}
+```
+
+O token retornado deve ser enviado nas rotas protegidas no header:
+
+```http
+Authorization: Bearer SEU_TOKEN
+```
+
+### 4. Testar as rotas públicas
+
+- `GET /api/vehicles`
+- `GET /api/vehicles/available`
+- `GET /api/electronics`
+- `GET /api/electronics/available`
+- `GET /api/insurance`
+
+Essas rotas não exigem autenticação e permitem validar o catálogo inicial inserido nas migrations.
+
+### 5. Testar o fluxo principal do laboratório
+
+O fluxo principal que demonstra comunicação por interfaces é:
+
+1. Consultar produtos disponíveis
+2. Criar uma locação
+3. Consultar o histórico de locações do usuário
+4. Processar o pagamento da locação
+
+Exemplo de criação de locação com veículo:
+
+```http
+POST /api/rentals
+Authorization: Bearer SEU_TOKEN
+Content-Type: application/json
+```
+
+```json
+{
+        "vehicle_id": 1,
+        "start_date": "2026-03-20",
+        "end_date": "2026-03-22",
+        "insurance_selected": true,
+        "insurance_price": 25
+}
+```
+
+Exemplo de criação de locação com eletrônico:
+
+```json
+{
+        "electronic_id": 1,
+        "start_date": "2026-03-20",
+        "end_date": "2026-03-22",
+        "insurance_selected": false,
+        "insurance_price": 0
+}
+```
+
+Depois disso, testar:
+
+- `GET /api/rentals/user/my-rentals`
+- `GET /api/rentals/:id`
+- `POST /api/rentals/:id/payment`
+- `POST /api/rentals/:id/cancel`
+
+### 6. Testar perfil do usuário autenticado
+
+Requisição:
+
+```http
+GET /api/auth/profile
+Authorization: Bearer SEU_TOKEN
+```
+
+### 7. Testar rotas administrativas
+
+As rotas administrativas exigem um usuário com `is_admin = true`.
+
+Rotas administrativas disponíveis:
+
+- `POST /api/vehicles`
+- `PUT /api/vehicles/:id`
+- `DELETE /api/vehicles/:id`
+- `POST /api/electronics`
+- `PUT /api/electronics/:id`
+- `DELETE /api/electronics/:id`
+- `POST /api/insurance`
+- `PUT /api/insurance/:id`
+- `GET /api/rentals`
+- `GET /api/users`
+- `GET /api/users/:id`
+- `POST /api/users/:userId/make-admin`
+- `DELETE /api/users/:userId/deactivate`
+
+Observação: como o seed do admin usa senha placeholder, essas rotas podem exigir ajuste manual no banco ou criação de um usuário com privilégios administrativos para teste completo.
+
+---
+
+## 10. Endpoints da API
 
 ### Autenticação
 | Método | Rota | Descrição |
 |---|---|---|
 | POST | `/api/auth/register` | Cadastrar novo usuário |
 | POST | `/api/auth/login` | Fazer login e obter token JWT |
+| GET | `/api/auth/profile` | Retornar perfil do usuário autenticado |
 
 ### Produtos — Veículos (`ProdutoService`)
 | Método | Rota | Descrição | Auth |
@@ -396,4 +611,13 @@ Verificar se está rodando: `GET http://localhost:5000/health`
 | POST | `/api/rentals/:id/payment` | Processar pagamento | Usuário |
 | POST | `/api/rentals/:id/cancel` | Cancelar locação | Usuário |
 | GET | `/api/rentals` | Listar todas as locações | Admin |
+
+### Usuários
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/api/users` | Listar usuários | Admin |
+| GET | `/api/users/:id` | Buscar usuário por ID | Admin |
+| POST | `/api/users/:userId/make-admin` | Promover usuário para administrador | Admin |
+| DELETE | `/api/users/:userId/deactivate` | Desativar usuário | Admin |
+| PUT | `/api/users/profile` | Atualizar perfil do usuário autenticado | Usuário |
 
