@@ -1,179 +1,404 @@
-## Membros do Grupo: 
-- Ana Carolina Lazzuri - 22.123.001-4
-- Paulo Hudson - 22.222.013-9
-- Nathan Gabriel da Fonseca Leite - 22.123.028-7
-- Raphael Garavati Herbert - 22.123.014-7
----
-# LocaFácil
+# CC7540 — LocaFácil API
 
-## Objetivo do Projeto
-O objetivo deste laboratório é a criação de uma plataforma que facilite o acesso à locação de automóveis e eletrônicos, permitindo que pessoas físicas e empresas utilizem bens de alto custo sem a necessidade de aquisição.
+> **Laboratório 4 — Componentes, Interfaces e Injeção de Dependência**  
+> Disciplina: CC7540 | Node.js + PostgreSQL + Express
 
 ---
 
-## Domínio do Sistema
+## Sumário
 
-- **Domínio:** Locação de automóveis e eletrônicos  
-- **Problema resolvido:** Facilita o acesso a bens de alto custo por meio de locação  
-- **Usuários principais:** Pessoas físicas e empresas  
-
----
-
-## Visão Geral do Sistema
-
-- **Nome do sistema:** LocaFácil  
-- **Usuários principais:** Pessoas físicas e empresas  
-- **Funcionalidades principais:**
-  - Cadastro de usuários
-  - Locação de automóveis e eletrônicos
-  - Seleção de seguro para automóveis
-  - Pagamento da locação
+1. [Visão Geral do Projeto](#1-visão-geral-do-projeto)
+2. [Componentes Implementados](#3-componentes-implementados)
+3. [Interfaces Fornecidas e Requeridas](#4-interfaces-fornecidas-e-requeridas)
+4. [Como a Comunicação Ocorre entre os Componentes](#5-como-a-comunicação-ocorre-entre-os-componentes)
+5. [Como o Acoplamento Direto Foi Evitado](#6-como-o-acoplamento-direto-foi-evitado)
+6. [Estrutura de Pastas](#7-estrutura-de-pastas)
+7. [Instruções para Execução](#8-instruções-para-execução)
+8. [Endpoints da API](#9-endpoints-da-api)
 
 ---
 
-## Processos de Negócio
+## 1. Visão Geral do Projeto
 
-### Cadastro
-- **Entrada:** Dados do usuário  
-- **Saída:** Cadastro realizado  
-- **Atores envolvidos:** Usuário  
+A **LocaFácil API** é uma plataforma de locação de veículos e equipamentos eletrônicos. O backend é construído em **Node.js + Express** com banco de dados **PostgreSQL**.
 
-### Locação
-- **Entrada:**  
-  - Seleção do produto (automóveis ou eletrônicos)  
-  - Prazo de locação  
-  - Opção de contratação de seguro (para automóveis)  
-- **Saída:** Identificador da locação  
-- **Atores envolvidos:** Usuário  
-
-### Pagamento
-- **Entrada:** Método de pagamento e dados de pagamento  
-- **Saída:** Nota fiscal eletrônica (NF-e) da locação  
-- **Atores envolvidos:** Usuário e gateway de pagamento  
+A arquitetura segue o princípio de **comunicação exclusivamente por interfaces**: nenhum componente conhece a implementação concreta de outro — apenas o contrato definido pela interface.
 
 ---
 
-## Diagrama Simplificado de Processo
 
-```mermaid
-flowchart TD
-    A[Início] --> B[Usuário informa dados]
+## 2. Componentes Implementados
 
-    %% Processo de Cadastro
-    B --> C{Dados válidos?}
-    C -- Não --> D[Solicitar correção dos dados]
-    D --> B
-    C -- Sim --> E[Cadastro realizado]
+### Componente 1 — `LocacaoComponent`
 
-    %% Processo de Locação
-    E --> F[Usuário seleciona tipo de produto]
-    F --> G{Tipo de produto?}
+**Arquivo:** `src/components/LocacaoComponent.js`
 
-    G -- Automóvel --> H[Selecionar automóvel]
-    H --> I[Definir prazo de locação]
-    I --> J[Selecionar opção de seguro]
-    J --> K[Registrar locação do automóvel]
+Responsável pelo ciclo de vida completo do contrato de aluguel. Orquestra a verificação de disponibilidade do produto, cálculo de preços e criação do registro de locação no banco de dados.
 
-    G -- Eletroeletrônico --> L[Selecionar eletrônico]
-    L --> M[Definir prazo de locação]
-    M --> N[Registrar locação do eletrônico]
+| | |
+|---|---|
+| **Interface fornecida** | `LocacaoService` |
+| **Interfaces requeridas** | `ProdutoService`, `SeguroService` |
+| **Métodos do contrato** | `iniciarLocacao()`, `registrarLocacao()`, `consultarHistorico()` |
 
-    K --> O[Gerar ID da locação]
-    N --> O[Gerar ID da locação]
+**Responsabilidades:**
+- Verificar disponibilidade do produto via `ProdutoService`
+- Calcular o total de dias e preço final (incluindo seguro opcional)
+- Registrar o contrato de locação no banco
+- Consultar o histórico de locações de um usuário
 
-    %% Processo de Pagamento
-    O --> P[Usuário escolhe método de pagamento]
-    P --> Q[Usuário informa dados de pagamento]
-    Q --> R[Gateway de pagamento processa pagamento]
+---
 
-    R --> S{Pagamento aprovado?}
-    S -- Não --> P
-    S -- Sim --> T[Emitir NF-e da locação]
+### Componente 2 — `PagamentoComponent`
 
-    T --> U[Fim]
+**Arquivo:** `src/components/PagamentoComponent.js`
+
+Responsável pelo processamento financeiro das locações. Simula a comunicação com um gateway de pagamento externo, validando o estado da locação antes de confirmar o pagamento.
+
+| | |
+|---|---|
+| **Interface fornecida** | `PagamentoService` |
+| **Interfaces requeridas** | `LocacaoService` |
+| **Métodos do contrato** | `processarPagamento()`, `confirmarPagamento()` |
+
+**Responsabilidades:**
+- Validar que a locação existe e não está cancelada
+- Verificar que o pagamento não foi confirmado anteriormente (idempotência)
+- Simular o processamento no gateway de pagamento
+- Atualizar o status de pagamento da locação via `LocacaoService`
+
+---
+
+### Componente 3 — `ProdutoComponent`
+
+**Arquivo:** `src/components/ProdutoComponent.js`
+
+Gerencia o catálogo unificado de itens disponíveis para locação (veículos e eletrônicos).
+
+| | |
+|---|---|
+| **Interface fornecida** | `ProdutoService` |
+| **Interfaces requeridas** | nenhuma |
+| **Métodos do contrato** | `visualizarProdutos()`, `obterDetalhesProduto()`, `verificarDisponibilidade()` |
+
+---
+
+### Componente 4 — `SeguroComponent`
+
+**Arquivo:** `src/components/SeguroComponent.js`
+
+Gerencia as apólices de seguro disponíveis para associação a uma locação.
+
+| | |
+|---|---|
+| **Interface fornecida** | `SeguroService` |
+| **Interfaces requeridas** | nenhuma |
+| **Métodos do contrato** | `listarOpcoesSeguro()`, `vincularSeguro()` |
+
+---
+
+## 3. Interfaces Fornecidas e Requeridas
+
+### Interfaces Fornecidas (o que cada componente expõe)
+
+#### `ProdutoService` — `src/interfaces/ProdutoService.js`
+```js
+visualizarProdutos()                        // lista todos os produtos disponíveis
+obterDetalhesProduto(idProduto, tipo)       // retorna detalhes de um produto
+verificarDisponibilidade(idProduto, tipo)   // verifica se o produto está disponível
 ```
----
 
-## Linguagens e Framewors utilizados
+#### `SeguroService` — `src/interfaces/SeguroService.js`
+```js
+listarOpcoesSeguro()                    // lista apólices disponíveis
+vincularSeguro(idLocacao, idSeguro)     // valida e associa um seguro a uma locação
+```
 
-- React
-- NodeJS
-- PostgreeSQL
+#### `LocacaoService` — `src/interfaces/LocacaoService.js`
+```js
+iniciarLocacao(idUsuario, idProduto, prazo)   // cria e registra a locação
+registrarLocacao(dadosLocacao)               // persiste o contrato no banco
+consultarHistorico(idUsuario)               // retorna as locações de um usuário
+```
 
----
-
-## Arquitetura Geral
-
-A arquitetura do **LocaFacil** foi projetada com foco em **modularidade, manutenibilidade e reuso de software**, adotando uma abordagem **serverless**. O sistema é composto por um frontend desenvolvido em **React**, que se comunica com uma **API em Node.js** hospedada na **Vercel**, e utiliza **PostgreSQL** como banco de dados relacional gerenciado pela **Neon**.
-
-Essa arquitetura elimina a necessidade de servidores dedicados, reduzindo a complexidade de gerenciamento de infraestrutura e permitindo escalabilidade automática conforme a demanda. O uso de serviços gerenciados reforça a separação de responsabilidades e contribui para um baixo acoplamento entre as camadas do sistema.
-
----
-
-## Justificativa das Tecnologias Utilizadas
-
-### Frontend – React 
-
-O React foi escolhido como framework de frontend por sua abordagem baseada em **componentes reutilizáveis**, o que favorece diretamente o **reuso de software em nível de componentes**. Essa característica permite que partes da interface sejam reaproveitadas em diferentes telas e contextos da aplicação.
-
-Além disso, o React possui:
-- Alta maturidade e ampla adoção no mercado;
-- Grande ecossistema de bibliotecas reutilizáveis;
-- Forte apoio da comunidade e documentação consolidada.
-
-Do ponto de vista arquitetural, o React contribui para a modularidade da aplicação e facilita a evolução incremental do sistema.
+#### `PagamentoService` — `src/interfaces/PagamentoService.js`
+```js
+processarPagamento(idLocacao, dadosPagamento)   // valida e processa o pagamento
+confirmarPagamento(idTransacao)                // confirma o status no banco
+```
 
 ---
 
-### Backend – API Serverless com Node.js no Vercel
+### Interfaces Requeridas por componente
 
-A API foi desenvolvida em **Node.js**, utilizando o modelo **serverless** disponibilizado pela plataforma **Vercel**. Essa escolha representa um **reuso de serviços e infraestrutura**, evitando o desenvolvimento e a manutenção de servidores próprios.
-
-O Node.js possibilita o reuso de bibliotecas maduras do ecossistema JavaScript e facilita a integração com o frontend. Já o Vercel oferece:
-- Deploy automatizado;
-- Escalabilidade sob demanda;
-- Redução do esforço operacional.
-
-Arquiteturalmente, essa decisão promove baixo acoplamento entre frontend e backend, além de permitir que as APIs sejam reutilizadas futuramente por outras aplicações ou clientes.
+| Componente | Requer |
+|---|---|
+| `ProdutoComponent` | — (nenhuma) |
+| `SeguroComponent` | — (nenhuma) |
+| `LocacaoComponent` | `ProdutoService`, `SeguroService` |
+| `PagamentoComponent` | `LocacaoService` |
 
 ---
 
-### Banco de Dados – PostgreSQL na Neon
+## 4. Como a Comunicação Ocorre entre os Componentes
 
-O PostgreSQL foi escolhido por ser um sistema de banco de dados relacional robusto, amplamente testado e adotado no mercado. Sua utilização por meio da plataforma **Neon** caracteriza um **reuso de sistema completo**, com forte impacto arquitetural.
+A comunicação entre componentes **nunca ocorre diretamente** — sempre passa pela interface.
 
-A Neon fornece o PostgreSQL como um serviço totalmente gerenciado, garantindo:
-- Alta disponibilidade;
-- Escalabilidade automática;
-- Integridade e consistência dos dados.
+### Exemplo: `LocacaoComponent` solicitando verificação de disponibilidade
 
-Essa abordagem reduz o esforço de configuração e manutenção, permitindo que o foco do desenvolvimento permaneça na lógica de negócio.
+```
+Rota POST /api/rentals
+        │
+        ▼
+locacaoService.iniciarLocacao(idUsuario, idProduto, prazo)
+        │
+        │  LocacaoComponent chama apenas métodos de ProdutoService:
+        ▼
+produtoService.verificarDisponibilidade(idProduto, tipo)
+produtoService.obterDetalhesProduto(idProduto, tipo)
+        │
+        ▼
+   ProdutoComponent executa a lógica concreta
+   (acessa Vehicle ou Electronic model conforme o tipo)
+```
+
+### Exemplo: `PagamentoComponent` confirmando pagamento
+
+```
+Rota POST /api/rentals/:id/payment
+        │
+        ▼
+pagamentoService.processarPagamento(idLocacao, dados)
+        │
+        │  PagamentoComponent chama apenas métodos de LocacaoService:
+        ▼
+locacaoService.buscarLocacao(idLocacao)      ← valida existência
+locacaoService.atualizarPagamento(id, status) ← confirma pagamento
+        │
+        ▼
+   LocacaoComponent executa a lógica concreta
+   (acessa RentalModel no banco)
+```
+
+### Mecanismo de Injeção de Dependência
+
+A injeção ocorre via `require` de módulos singleton. Cada componente exporta `new Component()` (uma única instância), e os componentes dependentes a recebem no momento do carregamento do módulo:
+
+```js
+// LocacaoComponent.js — recebe as dependências injetadas
+const produtoService = require('./ProdutoComponent');  // ← injeção de ProdutoService
+const seguroService  = require('./SeguroComponent');   // ← injeção de SeguroService
+
+class LocacaoComponent extends LocacaoService {
+  async iniciarLocacao(idUsuario, idProduto, prazo) {
+    // usa apenas a interface — não sabe que é um "ProdutoComponent"
+    const disponivel = await produtoService.verificarDisponibilidade(idProduto, prazo.tipo);
+    const produto    = await produtoService.obterDetalhesProduto(idProduto, prazo.tipo);
+    ...
+  }
+}
+```
+
+```js
+// PagamentoComponent.js — recebe LocacaoService injetado
+const locacaoService = require('./LocacaoComponent');  // ← injeção de LocacaoService
+
+class PagamentoComponent extends PagamentoService {
+  async processarPagamento(idLocacao, dadosPagamento) {
+    // usa apenas métodos do contrato LocacaoService
+    const locacao = await locacaoService.buscarLocacao(idLocacao);
+    ...
+  }
+}
+```
 
 ---
 
-## Reuso de Artefatos
+## 5. Como o Acoplamento Direto Foi Evitado
 
-O projeto aplica reuso de software em diferentes níveis:
+### Problema do acoplamento direto
 
-- **Reuso de Frameworks**: React e Node.js fornecem estruturas prontas que evitam a criação de soluções do zero.
-- **Reuso de Componentes**: Componentes React são projetados para serem reutilizáveis e independentes.
-- **Reuso de Serviços**: Infraestrutura serverless da Vercel e banco de dados gerenciado pela Neon.
-- **Reuso de APIs**: As APIs são desenvolvidas com contratos bem definidos, possibilitando sua reutilização em outros contextos.
+Sem interfaces, um componente precisaria conhecer a classe concreta da qual depende:
 
-Essa estratégia reduz o esforço de desenvolvimento, melhora a qualidade do software e acelera o tempo de entrega.
+```js
+// ❌ acoplamento direto — proibido nesta arquitetura
+const ProdutoComponent = require('./ProdutoComponent');
+const comp = new ProdutoComponent(); // LocacaoComponent conhece a implementação
+```
+
+### Solução adotada
+
+Cada componente depende **apenas do contrato** (interface), não da implementação:
+
+```js
+// ✅ comunicação via interface — a classe concreta é injetada externamente
+const produtoService = require('./ProdutoComponent'); // recebe um objeto já instanciado
+// LocacaoComponent só enxerga os métodos de ProdutoService
+```
+
+O `LocacaoComponent` nunca instancia `ProdutoComponent` diretamente — ele recebe uma instância pronta via `require`, e chama apenas os métodos definidos na interface `ProdutoService`. Se amanhã `ProdutoComponent` for substituído por outra implementação que respeite os mesmos métodos, `LocacaoComponent` **não precisa mudar nada**.
+
+### Benefícios obtidos
+
+| Princípio | Aplicação no projeto |
+|---|---|
+| **Baixo acoplamento** | Componentes dependem de interfaces, não de classes concretas |
+| **Alta coesão** | Cada componente tem uma responsabilidade clara e isolada |
+| **Substituibilidade** | Qualquer implementação pode ser trocada sem alterar os clientes |
+| **Testabilidade** | É possível injetar mocks das interfaces nos testes |
 
 ---
 
-## Análise Técnica e Arquitetural
+## 6. Estrutura de Pastas
 
-A seleção das tecnologias foi realizada com base em critérios técnicos e arquiteturais, como:
-- Maturidade das soluções;
-- Compatibilidade entre as tecnologias;
-- Facilidade de integração;
-- Redução de esforço de desenvolvimento;
-- Possibilidade de evolução e substituição futura.
+```
+src/
+├── interfaces/               ← contratos abstratos (<<interface>>)
+│   ├── ProdutoService.js       fornecida por ProdutoComponent
+│   ├── SeguroService.js        fornecida por SeguroComponent
+│   ├── LocacaoService.js       fornecida por LocacaoComponent
+│   └── PagamentoService.js     fornecida por PagamentoComponent
+│
+├── components/               ← implementações concretas
+│   ├── ProdutoComponent.js     extends ProdutoService | requer: nenhuma
+│   ├── SeguroComponent.js      extends SeguroService  | requer: nenhuma
+│   ├── LocacaoComponent.js     extends LocacaoService | requer: ProdutoService, SeguroService
+│   └── PagamentoComponent.js   extends PagamentoService | requer: LocacaoService
+│
+├── models/                   ← acesso ao banco de dados (PostgreSQL)
+│   ├── Vehicle.js
+│   ├── Electronic.js
+│   ├── Insurance.js
+│   ├── Rental.js
+│   └── User.js
+│
+├── routes/                   ← clientes das interfaces (Express Router)
+│   ├── vehicles.js             cliente de ProdutoService
+│   ├── electronics.js          cliente de ProdutoService
+│   ├── insurance.js            cliente de SeguroService
+│   ├── rentals.js              cliente de LocacaoService + PagamentoService
+│   ├── auth.js
+│   └── users.js
+│
+├── middlewares/
+│   └── auth.js               ← autenticação JWT
+│
+├── config/
+│   └── database.js           ← conexão com PostgreSQL
+│
+├── database/
+│   ├── migrate.js
+│   └── migrations/
+│       ├── 001_create_tables.sql
+│       ├── 002_seed_data.sql
+│       └── 003_admin_user.sql
+│
+└── index.js                  ← ponto de entrada da aplicação
+```
 
-A arquitetura prioriza simplicidade, clareza e baixo acoplamento, evitando complexidade desnecessária e facilitando a manutenção do sistema ao longo do tempo.
+---
 
+## 7. Instruções para Execução
 
+### Pré-requisitos
+
+- [Node.js](https://nodejs.org/) v18 ou superior
+- [PostgreSQL](https://www.postgresql.org/) v14 ou superior
+
+### 1. Clonar o repositório
+
+```bash
+git clone <url-do-repositorio>
+cd CC7540-LocaFacil_API_MAIN
+```
+
+### 2. Instalar dependências
+
+```bash
+npm install
+```
+
+### 3. Configurar variáveis de ambiente
+
+Crie um arquivo `.env` na raiz do projeto:
+
+```env
+DATABASE_URL=postgresql://usuario:senha@localhost:5432/locafacil
+JWT_SECRET=sua_chave_secreta_aqui
+PORT=5000
+NODE_ENV=development
+```
+
+### 4. Criar e popular o banco de dados
+
+```bash
+npm run migrate
+```
+
+Este comando executa os scripts em `src/database/migrations/` na ordem:
+- `001_create_tables.sql` — cria as tabelas
+- `002_seed_data.sql` — insere dados de exemplo
+- `003_admin_user.sql` — cria usuário administrador padrão
+
+### 5. Iniciar o servidor
+
+```bash
+# Produção
+npm start
+
+# Desenvolvimento (com hot reload)
+npm run dev
+```
+
+O servidor estará disponível em: `http://localhost:5000`
+
+Verificar se está rodando: `GET http://localhost:5000/health`
+
+---
+
+## 8. Endpoints da API
+
+### Autenticação
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/api/auth/register` | Cadastrar novo usuário |
+| POST | `/api/auth/login` | Fazer login e obter token JWT |
+
+### Produtos — Veículos (`ProdutoService`)
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/api/vehicles` | Listar todos os veículos | — |
+| GET | `/api/vehicles/available` | Listar veículos disponíveis | — |
+| GET | `/api/vehicles/:id` | Detalhes de um veículo | — |
+| POST | `/api/vehicles` | Criar veículo | Admin |
+| PUT | `/api/vehicles/:id` | Atualizar veículo | Admin |
+| DELETE | `/api/vehicles/:id` | Remover veículo | Admin |
+
+### Produtos — Eletrônicos (`ProdutoService`)
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/api/electronics` | Listar todos os eletrônicos | — |
+| GET | `/api/electronics/available` | Listar disponíveis | — |
+| GET | `/api/electronics/:id` | Detalhes de um eletrônico | — |
+| POST | `/api/electronics` | Criar eletrônico | Admin |
+| PUT | `/api/electronics/:id` | Atualizar eletrônico | Admin |
+| DELETE | `/api/electronics/:id` | Remover eletrônico | Admin |
+
+### Seguros (`SeguroService`)
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| GET | `/api/insurance` | Listar opções de seguro | — |
+| GET | `/api/insurance/:id` | Detalhes de um seguro | — |
+| POST | `/api/insurance` | Criar seguro | Admin |
+| PUT | `/api/insurance/:id` | Atualizar seguro | Admin |
+
+### Locações (`LocacaoService` + `PagamentoService`)
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| POST | `/api/rentals` | Criar nova locação | Usuário |
+| GET | `/api/rentals/user/my-rentals` | Histórico do usuário | Usuário |
+| GET | `/api/rentals/:id` | Detalhes de uma locação | Usuário/Admin |
+| POST | `/api/rentals/:id/payment` | Processar pagamento | Usuário |
+| POST | `/api/rentals/:id/cancel` | Cancelar locação | Usuário |
+| GET | `/api/rentals` | Listar todas as locações | Admin |
 
