@@ -1,10 +1,5 @@
 # CC7540 — LocaFácil API
 
-> **Laboratório 4 — Componentes, Interfaces e Injeção de Dependência**  
-> Disciplina: CC7540 | Node.js + PostgreSQL + Express
-
----
-
 ## Sumário
 
 1. [Visão Geral do Projeto](#1-visão-geral-do-projeto)
