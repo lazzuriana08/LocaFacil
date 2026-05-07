@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://locafacil.com/bpmn"
+             id="Definitions_LocaFacil">
+
+  <!-- ============================================================
+       PROCESSO TO-BE: Locação de Veículo ou Eletrônico — LocaFácil
+       Pool principal: Sistema LocaFácil
+       Lanes: Cliente | Sistema | Gateway de Pagamento
+       ============================================================ -->
+
+  <collaboration id="Collaboration_1">
+    <participant id="Pool_LocaFacil" name="LocaFácil — Processo de Locação" processRef="Process_Locacao"/>
+    <participant id="Pool_GatewayPagamento" name="Gateway de Pagamento Externo" processRef="Process_Gateway"/>
+    <messageFlow id="MF_EnviarPagamento"    sourceRef="Task_ProcessarPagamento"   targetRef="StartEvent_Gateway"/>
+    <messageFlow id="MF_RetornoGateway"     sourceRef="EndEvent_Gateway"           targetRef="IntermCatch_RetornoPagamento"/>
+  </collaboration>
+
+  <!-- ============================================================
+       PROCESS: LocaFácil (pool principal)
+       ============================================================ -->
+  <process id="Process_Locacao" isExecutable="true" name="Processo de Locação TO-BE">
+
+    <!-- ── LANES ─────────────────────────────────────────────── -->
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Cliente"  name="Cliente">
+        <flowNodeRef>StartEvent_1</flowNodeRef>
+        <flowNodeRef>Task_BuscarProdutos</flowNodeRef>
+        <flowNodeRef>Task_SelecionarProduto</flowNodeRef>
+        <flowNodeRef>Task_InformarPeriodo</flowNodeRef>
+        <flowNodeRef>GW_DesejaSeguro</flowNodeRef>
+        <flowNodeRef>Task_SelecionarSeguro</flowNodeRef>
+        <flowNodeRef>Task_RevisarConfirmar</flowNodeRef>
+        <flowNodeRef>GW_ClienteConfirma</flowNodeRef>
+        <flowNodeRef>Task_InformarDadosPagamento</flowNodeRef>
+        <flowNodeRef>Task_DevolverItem</flowNodeRef>
+        <flowNodeRef>EndEvent_Cancelado</flowNodeRef>
+      </lane>
+      <lane id="Lane_Sistema" name="Sistema LocaFácil">
+        <flowNodeRef>Task_VerificarDisponibilidade</flowNodeRef>
+        <flowNodeRef>GW_Disponivel</flowNodeRef>
+        <flowNodeRef>Task_NotificarIndisponivel</flowNodeRef>
+        <flowNodeRef>Task_CalcularTotal</flowNodeRef>
+        <flowNodeRef>Task_RegistrarLocacao</flowNodeRef>
+        <flowNodeRef>Task_ProcessarPagamento</flowNodeRef>
+        <flowNodeRef>IntermCatch_RetornoPagamento</flowNodeRef>
+        <flowNodeRef>GW_PagamentoAprovado</flowNodeRef>
+        <flowNodeRef>Task_ConfirmarLocacao</flowNodeRef>
+        <flowNodeRef>Task_EnviarNotificacaoEmail</flowNodeRef>
+        <flowNodeRef>Task_InspecionarItem</flowNodeRef>
+        <flowNodeRef>GW_ItemDanificado</flowNodeRef>
+        <flowNodeRef>Task_CobrarTaxaDano</flowNodeRef>
+        <flowNodeRef>Task_AtualizarDisponibilidade</flowNodeRef>
+        <flowNodeRef>Task_EncerrarLocacao</flowNodeRef>
+        <flowNodeRef>EndEvent_LocacaoConcluida</flowNodeRef>
+        <flowNodeRef>EndEvent_PagamentoRecusado</flowNodeRef>
+        <flowNodeRef>EndEvent_IndisponivelFim</flowNodeRef>
+      </lane>
+    </laneSet>
+
+    <!-- ── START EVENT ───────────────────────────────────────── -->
+    <startEvent id="StartEvent_1" name="Cliente inicia solicitação de locação">
+      <outgoing>SF_1</outgoing>
+    </startEvent>
+
+    <!-- ── TAREFA 1: Buscar produtos disponíveis ─────────────── -->
+    <userTask id="Task_BuscarProdutos" name="Buscar produtos disponíveis (veículos / eletrônicos)">
+      <documentation>
+        O cliente acessa o catálogo e filtra por tipo (veículo ou eletrônico),
+        categoria, preço e disponibilidade. O sistema exibe apenas itens com
+        status "disponível" em tempo real.
+      </documentation>
+      <incoming>SF_1</incoming>
+      <outgoing>SF_2</outgoing>
+    </userTask>
+
+    <!-- ── TAREFA 2: Selecionar produto ──────────────────────── -->
+    <userTask id="Task_SelecionarProduto" name="Selecionar produto e visualizar detalhes">
+      <documentation>
+        O cliente escolhe o item desejado. O sistema exibe detalhes completos:
+        descrição, especificações técnicas, preço diário e fotos.
+      </documentation>
+      <incoming>SF_2</incoming>
+      <outgoing>SF_3</outgoing>
+    </userTask>
+
+    <!-- ── TAREFA 3 (Sistema): Verificar disponibilidade ─────── -->
+    <serviceTask id="Task_VerificarDisponibilidade" name="Verificar disponibilidade em tempo real">
+      <documentation>
+        O sistema consulta o banco de dados e confirma que o produto selecionado
+        ainda está disponível no instante da solicitação (sem reservas sobrepostas).
+        Regra de negócio RN02 aplicada aqui.
+      </documentation>
+      <incoming>SF_3</incoming>
+      <outgoing>SF_4</outgoing>
+    </serviceTask>
+
+    <!-- ── GATEWAY 1: Produto disponível? ────────────────────── -->
+    <exclusiveGateway id="GW_Disponivel" name="Produto disponível?">
+      <incoming>SF_4</incoming>
+      <outgoing>SF_5_Sim</outgoing>
+      <outgoing>SF_5_Nao</outgoing>
+    </exclusiveGateway>
+
+    <!-- ── TAREFA (Sistema): Notificar indisponibilidade ──────── -->
+    <serviceTask id="Task_NotificarIndisponivel" name="Notificar indisponibilidade ao cliente">
+      <documentation>
+        O sistema exibe mensagem de indisponibilidade e sugere produtos similares.
+      </documentation>
+      <incoming>SF_5_Nao</incoming>
+      <outgoing>SF_IndisponivelFim</outgoing>
+    </serviceTask>
+
+    <endEvent id="EndEvent_IndisponivelFim" name="Locação não realizada (produto indisponível)">
+      <incoming>SF_IndisponivelFim</incoming>
+    </endEvent>
+
+    <!-- ── TAREFA 4: Informar período de locação ─────────────── -->
+    <userTask id="Task_InformarPeriodo" name="Informar data de início e data de devolução">
+      <documentation>
+        O cliente informa o período desejado. O sistema valida que a data de início
+        é igual ou posterior à data atual e que o período mínimo (RN03) é respeitado.
+      </documentation>
+      <incoming>SF_5_Sim</incoming>
+      <outgoing>SF_6</outgoing>
+    </userTask>
+
+    <!-- ── GATEWAY 2: Deseja contratar seguro? ────────────────── -->
+    <exclusiveGateway id="GW_DesejaSeguro" name="Deseja contratar seguro?">
+      <incoming>SF_6</incoming>
+      <outgoing>SF_7_Sim</outgoing>
+      <outgoing>SF_7_Nao</outgoing>
+    </exclusiveGateway>
+
+    <!-- ── TAREFA 5: Selecionar plano de seguro ───────────────── -->
+    <userTask id="Task_SelecionarSeguro" name="Selecionar plano de seguro">
+      <documentation>
+        O sistema lista os planos de seguro disponíveis com cobertura e valor.
+        O cliente escolhe o plano desejado. (RN08 — seguro recomendado para
+        locações acima de 7 dias).
+      </documentation>
+      <incoming>SF_7_Sim</incoming>
+      <outgoing>SF_8_ComSeguro</outgoing>
+    </userTask>
+
+    <!-- ── TAREFA 6 (Sistema): Calcular total da locação ──────── -->
+    <serviceTask id="Task_CalcularTotal" name="Calcular valor total da locação">
+      <documentation>
+        Fórmula: total = (preço diário × número de dias) + valor do seguro (se contratado).
+        Regra de negócio RN04 aplicada aqui.
+      </documentation>
+      <incoming>SF_8_ComSeguro</incoming>
+      <incoming>SF_7_Nao</incoming>
+      <outgoing>SF_9</outgoing>
+    </serviceTask>
+
+    <!-- ── TAREFA 7: Revisar e confirmar locação ─────────────── -->
+    <userTask id="Task_RevisarConfirmar" name="Revisar resumo e confirmar locação">
+      <documentation>
+        O sistema exibe o resumo da locação: produto, período, seguro (se contratado)
+        e valor total. O cliente revisa e decide se confirma ou cancela.
+      </documentation>
+      <incoming>SF_9</incoming>
+      <outgoing>SF_10</outgoing>
+    </userTask>
+
+    <!-- ── GATEWAY 3: Cliente confirma? ─────────────────────── -->
+    <exclusiveGateway id="GW_ClienteConfirma" name="Cliente confirma a locação?">
+      <incoming>SF_10</incoming>
+      <outgoing>SF_11_Sim</outgoing>
+      <outgoing>SF_11_Nao</outgoing>
+    </exclusiveGateway>
+
+    <endEvent id="EndEvent_Cancelado" name="Locação cancelada pelo cliente">
+      <incoming>SF_11_Nao</incoming>
+    </endEvent>
+
+    <!-- ── TAREFA 8 (Sistema): Registrar locação ─────────────── -->
+    <serviceTask id="Task_RegistrarLocacao" name="Registrar locação no banco de dados (status: pendente)">
+      <documentation>
+        O sistema cria o registro de locação com status "pendente_pagamento",
+        bloqueia o produto para evitar reservas sobrepostas durante o período
+        contratado (RN02 — sem sobreposição de períodos; RN08 — reserva confirmada
+        somente após pagamento) e gera um identificador único de contrato.
+      </documentation>
+      <incoming>SF_11_Sim</incoming>
+      <outgoing>SF_12</outgoing>
+    </serviceTask>
+
+    <!-- ── TAREFA 9: Informar dados de pagamento ─────────────── -->
+    <userTask id="Task_InformarDadosPagamento" name="Informar dados de pagamento">
+      <documentation>
+        O cliente fornece os dados do cartão de crédito/débito ou seleciona
+        outro método de pagamento aceito.
+      </documentation>
+      <incoming>SF_12</incoming>
+      <outgoing>SF_13</outgoing>
+    </userTask>
+
+    <!-- ── TAREFA 10 (Sistema): Processar pagamento ───────────── -->
+    <serviceTask id="Task_ProcessarPagamento" name="Enviar solicitação ao gateway de pagamento">
+      <documentation>
+        O sistema encaminha os dados ao gateway de pagamento externo via integração
+        segura (HTTPS/TLS). Nenhum dado de cartão é armazenado no sistema (RNF02).
+      </documentation>
+      <incoming>SF_13</incoming>
+      <outgoing>SF_14</outgoing>
+    </serviceTask>
+
+    <!-- ── INTERMEDIATE CATCH: Retorno do gateway ─────────────── -->
+    <intermediateCatchEvent id="IntermCatch_RetornoPagamento" name="Aguardar retorno do gateway">
+      <incoming>SF_14</incoming>
+      <outgoing>SF_15</outgoing>
+      <messageEventDefinition id="MsgEvDef_1"/>
+    </intermediateCatchEvent>
+
+    <!-- ── GATEWAY 4: Pagamento aprovado? ────────────────────── -->
+    <exclusiveGateway id="GW_PagamentoAprovado" name="Pagamento aprovado?">
+      <incoming>SF_15</incoming>
+      <outgoing>SF_16_Sim</outgoing>
+      <outgoing>SF_16_Nao</outgoing>
+    </exclusiveGateway>
+
+    <endEvent id="EndEvent_PagamentoRecusado" name="Locação cancelada (pagamento recusado)">
+      <incoming>SF_16_Nao</incoming>
+    </endEvent>
+
+    <!-- ── TAREFA 11 (Sistema): Confirmar locação ────────────── -->
+    <serviceTask id="Task_ConfirmarLocacao" name="Confirmar locação (status: ativa)">
+      <documentation>
+        O sistema atualiza o status da locação para "ativa", vincula o seguro
+        (se contratado) e emite o número do contrato. RN05 é satisfeito aqui.
+      </documentation>
+      <incoming>SF_16_Sim</incoming>
+      <outgoing>SF_17</outgoing>
+    </serviceTask>
+
+    <!-- ── TAREFA 12 (Sistema): Enviar notificação por e-mail ─── -->
+    <serviceTask id="Task_EnviarNotificacaoEmail" name="Enviar comprovante de locação por e-mail">
+      <documentation>
+        O sistema envia ao cliente um e-mail com o comprovante da locação:
+        número do contrato, produto, período, valor total e instruções de retirada.
+      </documentation>
+      <incoming>SF_17</incoming>
+      <outgoing>SF_18</outgoing>
+    </serviceTask>
+
+    <!-- ── (Evento de tempo — fim do período) ────────────────── -->
+    <intermediateCatchEvent id="Task_DevolverItem" name="Cliente devolve o item ao fim do período">
+      <incoming>SF_18</incoming>
+      <outgoing>SF_19</outgoing>
+      <timerEventDefinition id="TimerEvDef_1"/>
+    </intermediateCatchEvent>
+
+    <!-- ── TAREFA 13 (Sistema): Inspecionar item devolvido ────── -->
+    <userTask id="Task_InspecionarItem" name="Inspecionar estado do item devolvido">
+      <documentation>
+        O atendente/sistema registra a devolução e verifica se o item apresenta
+        danos ou avarias não previstas no contrato.
+      </documentation>
+      <incoming>SF_19</incoming>
+      <outgoing>SF_20</outgoing>
+    </userTask>
+
+    <!-- ── GATEWAY 5: Item danificado? ───────────────────────── -->
+    <exclusiveGateway id="GW_ItemDanificado" name="Item apresenta danos?">
+      <incoming>SF_20</incoming>
+      <outgoing>SF_21_Sim</outgoing>
+      <outgoing>SF_21_Nao</outgoing>
+    </exclusiveGateway>
+
+    <!-- ── TAREFA 14 (Sistema): Cobrar taxa de dano ───────────── -->
+    <serviceTask id="Task_CobrarTaxaDano" name="Calcular e cobrar taxa de dano">
+      <documentation>
+        O sistema calcula a taxa de dano conforme tabela de depreciação e
+        aciona a cobrança adicional. RN09 aplicado aqui.
+      </documentation>
+      <incoming>SF_21_Sim</incoming>
+      <outgoing>SF_22_ComDano</outgoing>
+    </serviceTask>
+
+    <!-- ── TAREFA 15 (Sistema): Atualizar disponibilidade ──────── -->
+    <serviceTask id="Task_AtualizarDisponibilidade" name="Atualizar disponibilidade do produto no catálogo">
+      <documentation>
+        O sistema altera o status do produto para "disponível", tornando-o
+        elegível para novas locações. RN07 aplicado aqui.
+      </documentation>
+      <incoming>SF_21_Nao</incoming>
+      <incoming>SF_22_ComDano</incoming>
+      <outgoing>SF_23</outgoing>
+    </serviceTask>
+
+    <!-- ── TAREFA 16 (Sistema): Encerrar locação ─────────────── -->
+    <serviceTask id="Task_EncerrarLocacao" name="Encerrar contrato de locação (status: concluída)">
+      <documentation>
+        O sistema atualiza o status da locação para "concluída" e persiste
+        o registro no histórico do cliente.
+      </documentation>
+      <incoming>SF_23</incoming>
+      <outgoing>SF_Fim</outgoing>
+    </serviceTask>
+
+    <!-- ── END EVENT ──────────────────────────────────────────── -->
+    <endEvent id="EndEvent_LocacaoConcluida" name="Locação concluída com sucesso">
+      <incoming>SF_Fim</incoming>
+    </endEvent>
+
+    <!-- ── SEQUENCE FLOWS ─────────────────────────────────────── -->
+    <sequenceFlow id="SF_1"              sourceRef="StartEvent_1"               targetRef="Task_BuscarProdutos"/>
+    <sequenceFlow id="SF_2"              sourceRef="Task_BuscarProdutos"         targetRef="Task_SelecionarProduto"/>
+    <sequenceFlow id="SF_3"              sourceRef="Task_SelecionarProduto"      targetRef="Task_VerificarDisponibilidade"/>
+    <sequenceFlow id="SF_4"              sourceRef="Task_VerificarDisponibilidade" targetRef="GW_Disponivel"/>
+    <sequenceFlow id="SF_5_Sim"          sourceRef="GW_Disponivel"              targetRef="Task_InformarPeriodo">
+      <conditionExpression>disponivel == true</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_5_Nao"          sourceRef="GW_Disponivel"              targetRef="Task_NotificarIndisponivel">
+      <conditionExpression>disponivel == false</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_IndisponivelFim" sourceRef="Task_NotificarIndisponivel" targetRef="EndEvent_IndisponivelFim"/>
+    <sequenceFlow id="SF_6"              sourceRef="Task_InformarPeriodo"        targetRef="GW_DesejaSeguro"/>
+    <sequenceFlow id="SF_7_Sim"          sourceRef="GW_DesejaSeguro"            targetRef="Task_SelecionarSeguro">
+      <conditionExpression>desejaSeguro == true</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_7_Nao"          sourceRef="GW_DesejaSeguro"            targetRef="Task_CalcularTotal">
+      <conditionExpression>desejaSeguro == false</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_8_ComSeguro"    sourceRef="Task_SelecionarSeguro"       targetRef="Task_CalcularTotal"/>
+    <sequenceFlow id="SF_9"              sourceRef="Task_CalcularTotal"          targetRef="Task_RevisarConfirmar"/>
+    <sequenceFlow id="SF_10"             sourceRef="Task_RevisarConfirmar"       targetRef="GW_ClienteConfirma"/>
+    <sequenceFlow id="SF_11_Sim"         sourceRef="GW_ClienteConfirma"         targetRef="Task_RegistrarLocacao">
+      <conditionExpression>clienteConfirma == true</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_11_Nao"         sourceRef="GW_ClienteConfirma"         targetRef="EndEvent_Cancelado">
+      <conditionExpression>clienteConfirma == false</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_12"             sourceRef="Task_RegistrarLocacao"       targetRef="Task_InformarDadosPagamento"/>
+    <sequenceFlow id="SF_13"             sourceRef="Task_InformarDadosPagamento" targetRef="Task_ProcessarPagamento"/>
+    <sequenceFlow id="SF_14"             sourceRef="Task_ProcessarPagamento"     targetRef="IntermCatch_RetornoPagamento"/>
+    <sequenceFlow id="SF_15"             sourceRef="IntermCatch_RetornoPagamento" targetRef="GW_PagamentoAprovado"/>
+    <sequenceFlow id="SF_16_Sim"         sourceRef="GW_PagamentoAprovado"        targetRef="Task_ConfirmarLocacao">
+      <conditionExpression>pagamentoAprovado == true</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_16_Nao"         sourceRef="GW_PagamentoAprovado"        targetRef="EndEvent_PagamentoRecusado">
+      <conditionExpression>pagamentoAprovado == false</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_17"             sourceRef="Task_ConfirmarLocacao"       targetRef="Task_EnviarNotificacaoEmail"/>
+    <sequenceFlow id="SF_18"             sourceRef="Task_EnviarNotificacaoEmail" targetRef="Task_DevolverItem"/>
+    <sequenceFlow id="SF_19"             sourceRef="Task_DevolverItem"           targetRef="Task_InspecionarItem"/>
+    <sequenceFlow id="SF_20"             sourceRef="Task_InspecionarItem"        targetRef="GW_ItemDanificado"/>
+    <sequenceFlow id="SF_21_Sim"         sourceRef="GW_ItemDanificado"           targetRef="Task_CobrarTaxaDano">
+      <conditionExpression>itemDanificado == true</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_21_Nao"         sourceRef="GW_ItemDanificado"           targetRef="Task_AtualizarDisponibilidade">
+      <conditionExpression>itemDanificado == false</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="SF_22_ComDano"     sourceRef="Task_CobrarTaxaDano"         targetRef="Task_AtualizarDisponibilidade"/>
+    <sequenceFlow id="SF_23"             sourceRef="Task_AtualizarDisponibilidade" targetRef="Task_EncerrarLocacao"/>
+    <sequenceFlow id="SF_Fim"            sourceRef="Task_EncerrarLocacao"        targetRef="EndEvent_LocacaoConcluida"/>
+
+  </process>
+
+  <!-- ============================================================
+       PROCESS: Gateway de Pagamento Externo (pool participante)
+       ============================================================ -->
+  <process id="Process_Gateway" isExecutable="false" name="Gateway de Pagamento">
+    <startEvent id="StartEvent_Gateway" name="Receber solicitação de pagamento">
+      <outgoing>SF_GW1</outgoing>
+      <messageEventDefinition id="MsgEvDef_GW1"/>
+    </startEvent>
+    <serviceTask id="Task_GW_Processar" name="Processar e autorizar pagamento">
+      <incoming>SF_GW1</incoming>
+      <outgoing>SF_GW2</outgoing>
+    </serviceTask>
+    <endEvent id="EndEvent_Gateway" name="Retornar resultado ao LocaFácil">
+      <incoming>SF_GW2</incoming>
+      <messageEventDefinition id="MsgEvDef_GW2"/>
+    </endEvent>
+    <sequenceFlow id="SF_GW1" sourceRef="StartEvent_Gateway"  targetRef="Task_GW_Processar"/>
+    <sequenceFlow id="SF_GW2" sourceRef="Task_GW_Processar"   targetRef="EndEvent_Gateway"/>
+  </process>
+
+</definitions>

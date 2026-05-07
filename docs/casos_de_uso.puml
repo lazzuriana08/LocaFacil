@@ -1,0 +1,123 @@
+@startuml casos_de_uso_locafacil
+' ============================================================
+' Diagrama de Casos de Uso — LocaFácil (TO-BE)
+' Notação UML — PlantUML
+' Consistente com o processo de negócio BPMN TO-BE
+' ============================================================
+
+title Diagrama de Casos de Uso — LocaFácil
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+    BackgroundColor LightYellow
+    BorderColor DarkOliveGreen
+    ArrowColor DarkSlateGray
+    ActorBorderColor DarkSlateGray
+    ActorFontSize 13
+}
+
+' ──────────────────────────────────────────────────────────
+' ATORES
+' ──────────────────────────────────────────────────────────
+actor "Cliente"                  as Cliente
+actor "Administrador"            as Admin
+actor "Gateway de Pagamento"     as GW << sistema externo >>
+
+' ──────────────────────────────────────────────────────────
+' SISTEMA
+' ──────────────────────────────────────────────────────────
+rectangle "LocaFácil" {
+
+    ' ── Autenticação ──────────────────────────────────────
+    usecase "UC01\nRegistrar-se no sistema"          as UC01
+    usecase "UC02\nFazer login"                      as UC02
+    usecase "UC03\nRecuperar senha"                  as UC03
+
+    ' ── Catálogo / Produtos ───────────────────────────────
+    usecase "UC04\nVisualizar catálogo de produtos"  as UC04
+    usecase "UC05\nFiltrar produtos disponíveis"     as UC05
+    usecase "UC06\nVisualizar detalhes do produto"   as UC06
+
+    ' ── Locação ───────────────────────────────────────────
+    usecase "UC07\nIniciar locação"                  as UC07
+    usecase "UC08\nVerificar disponibilidade"        as UC08
+    usecase "UC09\nSelecionar período de locação"    as UC09
+    usecase "UC10\nContratar seguro opcional"        as UC10
+    usecase "UC11\nCalcular valor total"             as UC11
+    usecase "UC12\nConfirmar locação"                as UC12
+    usecase "UC13\nCancelar locação"                 as UC13
+
+    ' ── Pagamento ─────────────────────────────────────────
+    usecase "UC14\nProcessar pagamento"              as UC14
+    usecase "UC15\nConfirmar pagamento"              as UC15
+    usecase "UC16\nCancelar por pagamento recusado"  as UC16
+
+    ' ── Pós-locação ───────────────────────────────────────
+    usecase "UC17\nConsultar histórico de locações"  as UC17
+    usecase "UC18\nRegistrar devolução do item"      as UC18
+    usecase "UC19\nInspecionar item devolvido"       as UC19
+    usecase "UC20\nCobrar taxa por dano"             as UC20
+    usecase "UC21\nAtualizar disponibilidade"        as UC21
+
+    ' ── Administração ─────────────────────────────────────
+    usecase "UC22\nGerenciar produtos (CRUD)"        as UC22
+    usecase "UC23\nGerenciar usuários"               as UC23
+    usecase "UC24\nGerenciar seguros"                as UC24
+    usecase "UC25\nVisualizar relatórios de locação" as UC25
+
+    ' ── Notificações ──────────────────────────────────────
+    usecase "UC26\nEnviar comprovante por e-mail"    as UC26
+}
+
+' ──────────────────────────────────────────────────────────
+' ASSOCIAÇÕES — Cliente
+' ──────────────────────────────────────────────────────────
+Cliente --> UC01
+Cliente --> UC02
+Cliente --> UC03
+Cliente --> UC04
+Cliente --> UC05
+Cliente --> UC06
+Cliente --> UC07
+Cliente --> UC09
+Cliente --> UC10
+Cliente --> UC12
+Cliente --> UC13
+Cliente --> UC14
+Cliente --> UC17
+Cliente --> UC18
+
+' ──────────────────────────────────────────────────────────
+' ASSOCIAÇÕES — Administrador (herda de Cliente onde faz sentido)
+' ──────────────────────────────────────────────────────────
+Admin    --> UC02
+Admin    --> UC19
+Admin    --> UC20
+Admin    --> UC22
+Admin    --> UC23
+Admin    --> UC24
+Admin    --> UC25
+
+' ──────────────────────────────────────────────────────────
+' ASSOCIAÇÕES — Gateway de Pagamento (sistema externo)
+' ──────────────────────────────────────────────────────────
+GW       --> UC15
+GW       --> UC16
+
+' ──────────────────────────────────────────────────────────
+' RELACIONAMENTOS <<include>> e <<extend>>
+' ──────────────────────────────────────────────────────────
+UC07 ..> UC08 : <<include>>
+UC07 ..> UC09 : <<include>>
+UC07 ..> UC11 : <<include>>
+UC10 ..> UC11 : <<extend>>
+UC12 ..> UC14 : <<include>>
+UC14 ..> UC15 : <<include>>
+UC14 ..> UC26 : <<extend>>
+UC16 ..> UC13 : <<include>>
+UC18 ..> UC19 : <<include>>
+UC18 ..> UC21 : <<include>>
+UC20 ..> UC19 : <<extend>>
+
+@enduml
